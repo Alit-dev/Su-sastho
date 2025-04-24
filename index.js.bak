@@ -1,0 +1,59 @@
+const express = require('express');
+const fs = require('fs');
+const csv = require('csv-parser');
+const Fuse = require('fuse.js');
+
+const app = express();
+const PORT = 3000;
+
+let medicines = [];
+let fuse = null;
+
+// Load CSV data
+fs.createReadStream('med.csv')
+  .pipe(csv())
+  .on('data', (data) => medicines.push(data))
+  .on('end', () => {
+    console.log('CSV loaded');
+
+    // Initialize Fuse.js with multiple keys
+    fuse = new Fuse(medicines, {
+      keys: ['Medicine Name', 'Strength', 'Full name', 'Manufactur By'], // Add more keys if needed
+      threshold: 0.4, // Adjust for fuzzy matching sensitivity
+    });
+  });
+
+// Search endpoint
+app.get('/', (req, res) => {
+  const query = req.query.med;
+
+  if (!query) {
+    return res.send('Please provide a medicine name with ?med=');
+  }
+
+  if (!fuse) {
+    return res.status(503).send('Server is still loading data. Please try again later.');
+  }
+
+  const results = fuse.search(query);
+
+  // Filter out empty string fields
+  const formattedResults = results.map(r => {
+    const item = r.item;
+    const cleanedItem = {};
+    for (const key in item) {
+      if (item[key] && item[key].trim() !== '') {
+        cleanedItem[key] = item[key];
+      }
+    }
+    return cleanedItem;
+  });
+
+  res.setHeader('Content-Type', 'application/json');
+  res.send(JSON.stringify(formattedResults, null, 2));
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+});
