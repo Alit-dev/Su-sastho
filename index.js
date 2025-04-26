@@ -4,7 +4,7 @@ const csv = require('csv-parser');
 const Fuse = require('fuse.js');
 
 const app = express();
-const PORT = 3000;
+const PORT = 3000; // এখানে সরাসরি 3000 হার্ডকোড করে দিলাম
 
 let medicines = [];
 let fuse = null;
@@ -16,11 +16,14 @@ fs.createReadStream('med.csv')
   .on('end', () => {
     console.log('CSV loaded');
 
-    // Initialize Fuse.js with multiple keys
+    // Initialize Fuse.js
     fuse = new Fuse(medicines, {
-      keys: ['Medicine Name', 'Full name', 'Manufactur By'], // Add more keys if needed
-      threshold: 0.4, // Adjust for fuzzy matching sensitivity
+      keys: ['Medicine Name', 'Full name', 'Manufactur By'], // যদি চাইলে আরও কী যোগ করতে পারো
+      threshold: 0.4
     });
+  })
+  .on('error', (err) => {
+    console.error('Error loading CSV:', err);
   });
 
 // Search endpoint
@@ -37,7 +40,7 @@ app.get('/', (req, res) => {
 
   const results = fuse.search(query);
 
-  // Filter out empty string fields
+  // Filter empty fields
   const formattedResults = results.map(r => {
     const item = r.item;
     const cleanedItem = {};
@@ -48,6 +51,10 @@ app.get('/', (req, res) => {
     }
     return cleanedItem;
   });
+
+  if (formattedResults.length === 0) {
+    return res.status(404).send('No matching medicine found.');
+  }
 
   res.setHeader('Content-Type', 'application/json');
   res.send(JSON.stringify(formattedResults, null, 2));
